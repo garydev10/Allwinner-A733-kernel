@@ -1,0 +1,13 @@
+[Unit]
+Description=Ensure Root Filesystem is Mounted Read-Write
+DefaultDependencies=no
+After=systemd-remount-fs.service
+Before=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'mount -o remount,rw /dev/mmcblk0p1 / 2>/dev/null || mount -o remount,rw / 2>/dev/null || true'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs.target
