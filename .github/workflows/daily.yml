@@ -279,7 +279,10 @@ jobs:
           mkdir -p rootfs/boot/dtb/allwinner/
           DTB_SRC=$(find ../ -type f -name "sun60i-a733-orangepi-4-pro.dtb" | head -1)
           if [ -n "$DTB_SRC" ] && [ -f "$DTB_SRC" ]; then
+            sudo mkdir -p rootfs/boot/dtb/allwinner rootfs/boot/dtb/sunxi
             sudo cp -v "$DTB_SRC" rootfs/boot/dtb/allwinner/
+            sudo ln -sf ../allwinner/sun60i-a733-orangepi-4-pro.dtb rootfs/boot/dtb/sunxi/sun60iw2p1-soc-system.dtb
+            sudo ln -sf allwinner/sun60i-a733-orangepi-4-pro.dtb rootfs/boot/dtb/sun60iw2p1-soc-system.dtb
           fi
 
           [ -f ../boot/boot.cmd ] && sudo cp -v ../boot/boot.cmd rootfs/boot/

@@ -12,6 +12,8 @@ setenv bootlogo "false"
 setenv rootfstype "ext4"
 setenv docker_optimizations "on"
 setenv earlycon "on"
+setenv fdtfile "allwinner/sun60i-a733-orangepi-4-pro.dtb"
+setenv overlay_prefix "sun60i-a733"
 
 echo "Boot script loaded from ${devtype} ${devnum}"
 
