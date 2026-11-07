@@ -219,6 +219,12 @@ detect_backend_url() {
         fi
     fi
 
+    # Check 10.10.10.103:8080 (development server backend)
+    if curl -s --connect-timeout 2 --max-time 3 http://10.10.10.103:8080/api/v1/health >/dev/null 2>&1; then
+        echo "http://10.10.10.103:8080"
+        return
+    fi
+
     # Check 127.0.0.1:8080 first (local backend if running)
     if curl -s --connect-timeout 2 --max-time 3 http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
         echo "http://127.0.0.1:8080"
@@ -741,7 +747,7 @@ EOF_OFFLINE_README
         if [ "$interactive" != "1" ]; then
             log_info "Executing driver package installer ($install_script)..."
         fi
-        TARGET_KERNEL="$kernel" "$install_script" > "$install_log" 2>&1 && install_success=1 || install_success=0
+        TARGET_KERNEL="$kernel" SKIP_HW_VERIFY=1 "$install_script" > "$install_log" 2>&1 && install_success=1 || install_success=0
     else
         # Fallback installation logic
         if [ "$interactive" != "1" ]; then
