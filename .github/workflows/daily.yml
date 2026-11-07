@@ -135,24 +135,6 @@ jobs:
         if: steps.check-kernel.outputs.should_skip != 'true' && github.event.inputs.reuse_run_id == ''
         run: |
           git clone --depth 1 https://github.com/orangepi-xunlong/orangepi-build.git orangepi-build
-
-      - name: Copy boot0 UART fix script
-          mkdir -p orangepi-build/external/packages/pack-uboot/sun60iw2/arch/arm/dts
-        if: steps.check-kernel.outputs.should_skip != 'true' && github.event.inputs.reuse_run_id == ''
-        run: |
-          mkdir -p orangepi-build/external/packages/pack-uboot/sun60iw2/tools
-          cp tools/fix_boot0_uart orangepi-build/external/packages/pack-uboot/sun60iw2/tools/
-          chmod +x orangepi-build/external/packages/pack-uboot/sun60iw2/tools/fix_boot0_uart
-      - name: Apply Orange Pi 4 Pro A733 patches and configuration
-        if: steps.check-kernel.outputs.should_skip != 'true' && github.event.inputs.reuse_run_id == ''
-        run: |
-          # Apply orangepi-build harness patch
-          git -C orangepi-build apply ../patch/orangepi-build.patch
-
-          # Apply Orange Pi 4 Pro A733 U-Boot boot config
-          git -C orangepi-build apply ../patch/0101-uboot-sun60iw2-a733-bootconfig.patch
-
-          # Apply A733 boot0 debug UART pin mux fix
           git -C orangepi-build apply ../patch/0103-uboot-sun60iw2-a733-boot0-uart.patch
 
           # Copy unified mainline kernel patch & builddeb packaging patch
@@ -482,3 +464,15 @@ jobs:
           else
             echo "### Successfully Published Release: [$TAG](https://github.com/${{ github.repository }}/releases/tag/${TAG})" >> $GITHUB_STEP_SUMMARY
           fi
+      - name: Copy boot0 UART fix script
+        if: steps.check-kernel.outputs.should_skip != " true\ && github.event.inputs.reuse_run_id == \\
+ run: |
+ mkdir -p orangepi-build/external/packages/pack-uboot/sun60iw2/tools
+ cp tools/fix_boot0_uart orangepi-build/external/packages/pack-uboot/sun60iw2/tools/
+ chmod +x orangepi-build/external/packages/pack-uboot/sun60iw2/tools/fix_boot0_uart
+
+ - name: Apply Orange Pi 4 Pro DTS wrapper
+ if: steps.check-kernel.outputs.should_skip != \true\ && github.event.inputs.reuse_run_id == \\
+ run: |
+ git -C orangepi-build/u-boot/v2018.05-sun60iw2 apply ../patch/0102-uboot-sun60iw2-a733-dts-add-board-dts.patch
+
