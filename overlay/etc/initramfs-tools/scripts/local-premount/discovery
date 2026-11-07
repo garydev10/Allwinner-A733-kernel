@@ -1,0 +1,18 @@
+#!/bin/sh
+PREREQ=""
+prereqs() {
+    echo "$PREREQ"
+}
+case $1 in
+prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+echo "[INITRAMFS PREMOUNT] Preparing to mount root device $ROOT onto $rootmnt"
+if [ ! -e "$ROOT" ]; then
+    echo "[INITRAMFS PREMOUNT] WARNING: Root $ROOT not directly reachable. Available partitions:"
+    cat /proc/partitions
+    blkid || true
+fi

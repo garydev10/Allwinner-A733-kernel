@@ -1,0 +1,67 @@
+#!/bin/sh
+PREREQ=""
+prereqs() {
+    echo "$PREREQ"
+}
+case $1 in
+prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+echo "========================================================"
+echo "[INITRAMFS DISCOVERY] Scanning and discovering block devices..."
+
+# Settle udev events to ensure device nodes exist
+udevadm trigger --action=add >/dev/null 2>&1 || true
+udevadm settle --timeout=5 >/dev/null 2>&1 || true
+
+echo "[INITRAMFS DISCOVERY] Available block devices (/proc/partitions):"
+cat /proc/partitions
+
+echo "[INITRAMFS DISCOVERY] Discovered filesystem UUIDs and PARTUUIDs (blkid):"
+blkid || true
+
+echo "[INITRAMFS DISCOVERY] Device nodes under /dev/disk/by-uuid:"
+ls -la /dev/disk/by-uuid 2>/dev/null || true
+
+echo "[INITRAMFS DISCOVERY] Device nodes under /dev/disk/by-partuuid:"
+ls -la /dev/disk/by-partuuid 2>/dev/null || true
+
+# If ROOT is UUID=... ensure by-uuid symlink exists so local mount finds it
+case "$ROOT" in
+UUID=*)
+    target_uuid="${ROOT#UUID=}"
+    if [ ! -e "/dev/disk/by-uuid/$target_uuid" ]; then
+        echo "[INITRAMFS DISCOVERY] Root $ROOT not yet in /dev/disk/by-uuid, resolving..."
+        dev=$(blkid -U "$target_uuid" 2>/dev/null || blkid -l -t UUID="$target_uuid" -o device 2>/dev/null || true)
+        if [ -n "$dev" ] && [ -b "$dev" ]; then
+            echo "[INITRAMFS DISCOVERY] Resolved $ROOT -> $dev"
+            mkdir -p /dev/disk/by-uuid
+            ln -sf "$dev" "/dev/disk/by-uuid/$target_uuid"
+        elif [ -b "/dev/mmcblk0p1" ]; then
+            echo "[INITRAMFS DISCOVERY] Fallback: Linking $ROOT -> /dev/mmcblk0p1"
+            mkdir -p /dev/disk/by-uuid
+            ln -sf "/dev/mmcblk0p1" "/dev/disk/by-uuid/$target_uuid"
+        fi
+    fi
+    ;;
+PARTUUID=*)
+    target_partuuid="${ROOT#PARTUUID=}"
+    if [ ! -e "/dev/disk/by-partuuid/$target_partuuid" ]; then
+        echo "[INITRAMFS DISCOVERY] Root $ROOT not yet in /dev/disk/by-partuuid, resolving..."
+        dev=$(blkid -l -t PARTUUID="$target_partuuid" -o device 2>/dev/null || true)
+        if [ -n "$dev" ] && [ -b "$dev" ]; then
+            echo "[INITRAMFS DISCOVERY] Resolved $ROOT -> $dev"
+            mkdir -p /dev/disk/by-partuuid
+            ln -sf "$dev" "/dev/disk/by-partuuid/$target_partuuid"
+        elif [ -b "/dev/mmcblk0p1" ]; then
+            echo "[INITRAMFS DISCOVERY] Fallback: Linking $ROOT -> /dev/mmcblk0p1"
+            mkdir -p /dev/disk/by-partuuid
+            ln -sf "/dev/mmcblk0p1" "/dev/disk/by-partuuid/$target_partuuid"
+        fi
+    fi
+    ;;
+esac
+echo "========================================================"

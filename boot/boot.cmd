@@ -6,7 +6,7 @@
 setenv load_addr "0x43100000"
 setenv overlay_error "false"
 # default values
-setenv verbosity "1"
+setenv verbosity "7"
 setenv console "both"
 setenv bootlogo "false"
 setenv rootfstype "ext4"
@@ -22,9 +22,12 @@ fi
 
 if test "${logo}" = "disabled"; then setenv logo "logo.nologo"; fi
 
-if test "${console}" = "display" || test "${console}" = "both"; then setenv consoleargs "console=tty1"; fi
-if test "${console}" = "serial" || test "${console}" = "both"; then setenv consoleargs "console=ttyS0,115200 ${consoleargs}"; fi
-if test "${earlycon}" = "on"; then setenv consoleargs "earlyprintk=sunxi-uart,0x02500000 initcall_debug=0 ${consoleargs}"; fi
+# Ensure serial console is last when both is selected so it remains primary on UART
+if test "${console}" = "display"; then setenv consoleargs "console=tty1"; fi
+if test "${console}" = "serial"; then setenv consoleargs "console=ttyS0,115200"; fi
+if test "${console}" = "both"; then setenv consoleargs "console=tty1 console=ttyS0,115200"; fi
+
+if test "${earlycon}" = "on"; then setenv consoleargs "earlycon=uart8250,mmio32,0x02500000 earlyprintk=sunxi-uart,0x02500000 ${consoleargs}"; fi
 if test "${bootlogo}" = "true"; then
 	setenv consoleargs "splash plymouth.ignore-serial-consoles ${consoleargs}";
 else
@@ -35,7 +38,7 @@ part uuid ${devtype} ${devnum}:1 partuuid
 
 if test -z "${rootdev}"; then rootdev=PARTUUID="${partuuid}"; fi
 
-setenv bootargs "root=${rootdev} rootwait rootfstype=${rootfstype} ${consoleargs} consoleblank=0 loglevel=${verbosity} clk_ignore_unused swiotlb=65536 usb-storage.quirks=${usbstoragequirks} ${extraargs} ${extraboardargs}"
+setenv bootargs "root=${rootdev} rootwait rootdelay=1 rootfstype=${rootfstype} ${consoleargs} consoleblank=0 loglevel=${verbosity} clk_ignore_unused swiotlb=65536 usb-storage.quirks=${usbstoragequirks} ${extraargs} ${extraboardargs}"
 
 if test "${docker_optimizations}" = "on"; then setenv bootargs "${bootargs} cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1"; fi
 
