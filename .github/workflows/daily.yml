@@ -147,8 +147,6 @@ jobs:
 
           # Copy boot0 UART fix script
           mkdir -p orangepi-build/external/packages/pack-uboot/sun60iw2/tools
-          cp tools/fix_boot0_uart orangepi-build/external/packages/pack-uboot/sun60iw2/tools/
-          chmod +x orangepi-build/external/packages/pack-uboot/sun60iw2/tools/fix_boot0_uart
 
           # Copy unified mainline kernel patch & builddeb packaging patch
           mkdir -p orangepi-build/external/patch/kernel/sun60iw2-next

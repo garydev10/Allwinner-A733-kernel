@@ -32,7 +32,7 @@ index 3674a3b..4759345 100755
 --- a/external/config/boards/orangepi4pro.conf
 +++ b/external/config/boards/orangepi4pro.conf
 @@ -5,8 +5,10 @@ BOOTCONFIG="sun60iw2p1_a733_defconfig"
- BOOT_LOGO="desktop"
+ BOOT_LOGO="no"
  BOOT_FDT_FILE="allwinner/sun60i-a733-orangepi-4-pro.dtb"
  MODULES="aic8800_fdrv aic8800_btlpm pvrsrvkm"
 -KERNEL_TARGET="current legacy"
