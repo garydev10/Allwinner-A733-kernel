@@ -1,0 +1,294 @@
+name: Build & Release Radxa Cubie A7A Alpha (Debian Trixie)
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Debian release'
+        required: true
+        default: 'trixie'
+        type: choice
+        options:
+          - trixie
+          - bookworm
+      flavour:
+        description: 'Flavour / Edition'
+        required: true
+        default: 'desktop-xfce'
+        type: choice
+        options:
+          - desktop-xfce
+          - minimal
+          - server
+      tag_name:
+        description: 'Custom release tag'
+        required: false
+        default: 'radxa-cubie-a7a-alpha'
+      publish_release:
+        description: 'Publish or update GitHub release'
+        required: true
+        default: true
+        type: boolean
+  push:
+    paths:
+      - '.github/workflows/radxa-cubie-a7a-alpha.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Release Radxa Cubie A7A Alpha Image
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Free disk space on runner
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force 2>/dev/null || true
+          df -h
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git make gcc g++ gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bison flex bc libssl-dev libncurses-dev libelf-dev \
+            debootstrap qemu-user-static binfmt-support u-boot-tools rsync cpio \
+            kmod parted dosfstools fdisk xz-utils curl wget zstd pigz python3 \
+            device-tree-compiler dialog lzop libyaml-dev pkg-config
+
+      - name: Clone build harness
+        run: |
+          git clone --depth 1 https://github.com/orangepi-xunlong/orangepi-build.git orangepi-build
+
+      - name: Apply A733 patches and configuration
+        run: |
+          git -C orangepi-build apply ../patch/orangepi-build.patch
+
+          mkdir -p orangepi-build/external/patch/kernel/sun60iw2-next
+          cp patch/0001-allwinner-a733-orangepi-4-pro-6.18-mainline.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+          cp patch/0300-packaging-armbian-builddeb.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+
+          mkdir -p orangepi-build/external/config/kernel
+          cp config/orangepi_4pro_defconfig orangepi-build/external/config/kernel/linux-sun60iw2-next-a733.config
+
+          mkdir -p orangepi-build/external/packages/bsp/common
+          cp -rv overlay/* orangepi-build/external/packages/bsp/common/
+
+      - name: Build Base Image via harness
+        run: |
+          RELEASE="${{ github.event.inputs.release || 'trixie' }}"
+          FLAVOUR="${{ github.event.inputs.flavour || 'desktop-xfce' }}"
+
+          BUILD_MINIMAL="no"
+          BUILD_DESKTOP="no"
+          DESKTOP_ENV_ARGS=""
+
+          case "$FLAVOUR" in
+            minimal)
+              BUILD_MINIMAL="yes"
+              BUILD_DESKTOP="no"
+              ;;
+            server)
+              BUILD_MINIMAL="no"
+              BUILD_DESKTOP="no"
+              ;;
+            desktop-xfce)
+              BUILD_MINIMAL="no"
+              BUILD_DESKTOP="yes"
+              DESKTOP_ENV_ARGS="DESKTOP_ENVIRONMENT=xfce DESKTOP_ENVIRONMENT_CONFIG_NAME=config_base DESKTOP_APPGROUPS_SELECTED="
+              ;;
+          esac
+
+          echo "=== Building Base Image: Release=$RELEASE, Flavour=$FLAVOUR ==="
+          cd orangepi-build
+          sudo ./build.sh \
+            BOARD=orangepi4pro \
+            BRANCH=next \
+            BUILD_OPT=image \
+            RELEASE=${RELEASE} \
+            BUILD_MINIMAL=${BUILD_MINIMAL} \
+            BUILD_DESKTOP=${BUILD_DESKTOP} \
+            ${DESKTOP_ENV_ARGS}
+
+      - name: Transform Image for Radxa Cubie A7A
+        run: |
+          echo "=== Transforming built image into Radxa Cubie A7A Alpha ==="
+          RAW_IMG=$(find orangepi-build/output/ -type f -name "*.img" | head -n 1)
+          if [ -z "$RAW_IMG" ]; then
+            echo "ERROR: Built raw .img not found!"
+            find orangepi-build/output/ -ls || true
+            exit 1
+          fi
+
+          RADXA_IMG_NAME="Radxa-Cubie-A7A_1.0.0-alpha_${{ github.event.inputs.release || 'trixie' }}_${{ github.event.inputs.flavour || 'desktop-xfce' }}_linux6.18.img"
+          RADXA_IMG="orangepi-build/output/${RADXA_IMG_NAME}"
+          sudo mv -v "$RAW_IMG" "$RADXA_IMG"
+
+          MNT="/mnt/radxa_loop"
+          sudo mkdir -p "$MNT"
+          OFFSET=$((65536 * 512))
+          sudo mount -o loop,offset=$OFFSET "$RADXA_IMG" "$MNT"
+
+          # 1. Install Cubie A7A DTB
+          CUBIE_DTB="orangepi-build/kernel/linux-6.18.y/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dtb"
+          if [ ! -f "$CUBIE_DTB" ]; then
+            CUBIE_DTB=$(find orangepi-build/ -name "sun60i-a733-cubie-a7a.dtb" | head -n 1)
+          fi
+          echo "Using Cubie A7A DTB from: $CUBIE_DTB"
+          sudo cp -v "$CUBIE_DTB" "$MNT/boot/sun60i-a733-cubie-a7a.dtb"
+          sudo cp -v "$CUBIE_DTB" "$MNT/boot/dtb/allwinner/sun60i-a733-cubie-a7a.dtb"
+          sudo cp -v "$CUBIE_DTB" "$MNT/boot/dtb/allwinner/sun60i-a733-orangepi-4-pro.dtb"
+          find "$MNT/boot/dtb-"* -maxdepth 2 -name "allwinner" -exec sudo cp -v "$CUBIE_DTB" {}/sun60i-a733-cubie-a7a.dtb \; 2>/dev/null || true
+          find "$MNT/boot/dtb-"* -maxdepth 2 -name "allwinner" -exec sudo cp -v "$CUBIE_DTB" {}/sun60i-a733-orangepi-4-pro.dtb \; 2>/dev/null || true
+
+          # 2. Configure Bootloader Environment
+          sudo tee "$MNT/boot/radxaEnv.txt" > /dev/null << 'ENV_EOF'
+verbosity=1
+bootlogo=false
+console=both
+overlay_prefix=sun60i-a733
+fdtfile=allwinner/sun60i-a733-cubie-a7a.dtb
+rootfstype=ext4
+extraargs=cma=256M
+ENV_EOF
+          sudo cp -v "$MNT/boot/radxaEnv.txt" "$MNT/boot/orangepiEnv.txt"
+
+          # 3. Patch boot.cmd and recompile boot.scr
+          sudo sed -i 's/if test -e ${devtype} ${devnum} ${prefix}orangepiEnv.txt; then/if test -e ${devtype} ${devnum} ${prefix}radxaEnv.txt; then\n\tload ${devtype} ${devnum} ${load_addr} ${prefix}radxaEnv.txt\n\tenv import -t ${load_addr} ${filesize}\nelif test -e ${devtype} ${devnum} ${prefix}orangepiEnv.txt; then/' "$MNT/boot/boot.cmd"
+          sudo mkimage -C none -A arm -T script -d "$MNT/boot/boot.cmd" "$MNT/boot/boot.scr"
+
+          # 4. Hostname and Hosts
+          echo "radxa-cubie-a7a" | sudo tee "$MNT/etc/hostname"
+          sudo tee "$MNT/etc/hosts" > /dev/null << 'HOSTS_EOF'
+127.0.0.1   localhost
+127.0.1.1   radxa-cubie-a7a
+::1         localhost radxa-cubie-a7a ip6-localhost ip6-loopback
+fe00::0     ip6-localnet
+ff00::0     ip6-mcastprefix
+ff02::1     ip6-allnodes
+ff02::2     ip6-allrouters
+HOSTS_EOF
+
+          # 5. OS Branding
+          sudo tee "$MNT/etc/os-release" > /dev/null << 'OS_EOF'
+PRETTY_NAME="Radxa OS 1.0 Alpha (Trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie) Alpha"
+VERSION_CODENAME=trixie
+ID=debian
+HOME_URL="https://radxa.com"
+SUPPORT_URL="https://forum.radxa.com"
+BUG_REPORT_URL="https://github.com/radxa"
+OS_EOF
+          echo "Radxa Cubie A7A Alpha (Debian Trixie) \l\n" | sudo tee "$MNT/etc/issue"
+          echo "Radxa Cubie A7A Alpha (Debian Trixie)" | sudo tee "$MNT/etc/issue.net"
+
+          # 6. Create Radxa User
+          PASS_HASH=$(openssl passwd -6 -salt radxa123 radxa)
+          sudo sed -i '/orangepi/ s/$/,radxa/' "$MNT/etc/group"
+          echo "radxa:x:1001:" | sudo tee -a "$MNT/etc/group"
+          echo "radxa:x:1001:1001:Radxa User,,,:/home/radxa:/bin/bash" | sudo tee -a "$MNT/etc/passwd"
+          echo "radxa:${PASS_HASH}:19800:0:99999:7:::" | sudo tee -a "$MNT/etc/shadow"
+          sudo cp -a "$MNT/home/orangepi/." "$MNT/home/radxa/"
+          sudo chown -R 1001:1001 "$MNT/home/radxa"
+          echo "radxa ALL=(ALL) NOPASSWD: ALL" | sudo tee "$MNT/etc/sudoers.d/010_radxa-nopasswd"
+
+          # 7. LightDM Autologin
+          if [ -f "$MNT/etc/lightdm/lightdm.conf.d/22-orangepi-autologin.conf" ]; then
+            sudo sed -i 's/autologin-user=orangepi/autologin-user=radxa/' "$MNT/etc/lightdm/lightdm.conf.d/22-orangepi-autologin.conf"
+          fi
+
+          # 8. Welcome Banner
+          if [ -f "$MNT/etc/update-motd.d/10-orangepi-header" ]; then
+            sudo tee "$MNT/etc/update-motd.d/10-orangepi-header" > /dev/null << 'MOTD_EOF'
+#!/bin/sh
+echo "Welcome to Radxa Cubie A7A Alpha (Debian Trixie)"
+MOTD_EOF
+          fi
+
+          sudo umount "$MNT"
+          echo "[+] Image transformation complete: $RADXA_IMG"
+
+      - name: Package artifacts
+        run: |
+          mkdir -p release_artifacts
+          echo "Compressing Radxa image with xz..."
+          find orangepi-build/output/ -type f -name "Radxa-Cubie-A7A*.img" | while read -r img; do
+            base=$(basename "$img")
+            xz -T0 -3 -c "$img" > "release_artifacts/${base}.xz"
+            (cd release_artifacts && sha256sum "${base}.xz" > "${base}.xz.sha256")
+          done
+
+          if [ -d "orangepi-build/output/debs" ]; then
+            find orangepi-build/output/debs/ -type f -name "*.deb" -exec cp -v {} release_artifacts/ \;
+          fi
+
+          (cd release_artifacts && sha256sum * > SHA256SUMS 2>/dev/null || true)
+          ls -lh release_artifacts/
+
+      - name: Upload Image Artifact to CI
+        uses: actions/upload-artifact@v4
+        with:
+          name: radxa-cubie-a7a-alpha-image
+          path: release_artifacts/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish_release != false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE_STR=$(date -u +'%Y-%m-%d')
+          TAG="${{ github.event.inputs.tag_name || 'radxa-cubie-a7a-alpha' }}"
+          TITLE="Radxa Cubie A7A: Debian 13 Trixie Alpha (${DATE_STR})"
+
+          cat << EOF > release_notes.md
+          # Radxa Cubie A7A - Debian 13 Trixie Alpha Release
+
+          **Board**: Radxa Cubie A7A
+          **SoC**: Allwinner A733 (\`sun60iw2\`)
+          **Kernel**: Linux 6.18.y (\`linux-6.18.y\`)
+          **Distribution**: Debian 13 (Trixie)
+          **Flavour**: ${{ github.event.inputs.flavour || 'desktop-xfce' }}
+          **Release Tag**: \`${TAG}\`
+          **Build Date**: ${DATE_STR}
+
+          ### Default Credentials:
+          - User: \`radxa\`
+          - Password: \`radxa\` (with passwordless sudo)
+          - Root: \`root\` / \`radxa\`
+
+          ### Alpha Hardware Integration:
+          - Primary Device Tree set to \`sun60i-a733-cubie-a7a.dtb\`
+          - USB VBUS Power: \`PL2\` & \`PM5\` active high regulators enabled (USB Mouse & Keyboard working)
+          - Internal Hub & Wi-Fi: AIC8800 Wi-Fi 6 & BT power lines (\`PM0\` / \`PM1\`) active
+          - Ethernet: Motorcomm YT8531 RGMII PHY reset (\`PH16\`) and GMAC clock delays configured
+          - Cedar VPU hardware decode ready with scaledown support
+
+          ### Verification:
+          Download the \`.img.xz\` asset and verify with the matching \`.sha256\` checksum or \`SHA256SUMS\`.
+          EOF
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TITLE" --notes-file release_notes.md --prerelease
+          else
+            gh release edit "$TAG" --title "$TITLE" --notes-file release_notes.md --prerelease
+          fi
+
+          for asset in release_artifacts/*; do
+            [ -f "$asset" ] || continue
+            echo "Uploading $(basename "$asset")..."
+            gh release upload "$TAG" "$asset" --clobber
+          done
