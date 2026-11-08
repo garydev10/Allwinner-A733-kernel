@@ -77,6 +77,7 @@ jobs:
 
           mkdir -p orangepi-build/external/patch/kernel/sun60iw2-next
           cp patch/0001-allwinner-a733-orangepi-4-pro-6.18-mainline.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+          cp patch/0002-allwinner-a733-cubie-a7a-dts.patch orangepi-build/external/patch/kernel/sun60iw2-next/
           cp patch/0300-packaging-armbian-builddeb.patch orangepi-build/external/patch/kernel/sun60iw2-next/
 
           mkdir -p orangepi-build/external/config/kernel
@@ -141,9 +142,13 @@ jobs:
           sudo mount -o loop,offset=$OFFSET "$RADXA_IMG" "$MNT"
 
           # 1. Install Cubie A7A DTB
-          CUBIE_DTB="orangepi-build/kernel/linux-6.18.y/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dtb"
-          if [ ! -f "$CUBIE_DTB" ]; then
-            CUBIE_DTB=$(find orangepi-build/ -name "sun60i-a733-cubie-a7a.dtb" | head -n 1)
+          mkdir -p /tmp/dtb_compile
+          CUBIE_DTB=$(find orangepi-build/ -name "sun60i-a733-cubie-a7a.dtb" 2>/dev/null | head -n 1)
+          if [ -z "$CUBIE_DTB" ] || [ ! -f "$CUBIE_DTB" ]; then
+            echo "Compiling Cubie A7A DTB from dts/..."
+            cpp -nostdinc -I dts -I dts/include -undef -x assembler-with-cpp dts/sun60i-a733-cubie-a7a.dts /tmp/cubie.dts.pre
+            dtc -I dts -O dtb -o /tmp/dtb_compile/sun60i-a733-cubie-a7a.dtb /tmp/cubie.dts.pre
+            CUBIE_DTB="/tmp/dtb_compile/sun60i-a733-cubie-a7a.dtb"
           fi
           echo "Using Cubie A7A DTB from: $CUBIE_DTB"
           sudo cp -v "$CUBIE_DTB" "$MNT/boot/sun60i-a733-cubie-a7a.dtb"
@@ -152,10 +157,19 @@ jobs:
           find "$MNT/boot/dtb-"* -maxdepth 2 -name "allwinner" -exec sudo cp -v "$CUBIE_DTB" {}/sun60i-a733-cubie-a7a.dtb \; 2>/dev/null || true
           find "$MNT/boot/dtb-"* -maxdepth 2 -name "allwinner" -exec sudo cp -v "$CUBIE_DTB" {}/sun60i-a733-orangepi-4-pro.dtb \; 2>/dev/null || true
 
-          # 2. Configure Bootloader Environment
+          # 2. Install Radxa Splash Screens & Watermark
+          if [ -d "splash" ]; then
+            [ -f "splash/boot.bmp" ] && sudo cp -v splash/boot.bmp "$MNT/boot/boot.bmp"
+            [ -f "splash/logo.bmp" ] && sudo cp -v splash/logo.bmp "$MNT/boot/logo.bmp"
+            if [ -d "$MNT/usr/share/plymouth/themes/orangepi" ]; then
+              [ -f "splash/watermark.png" ] && sudo cp -v splash/watermark.png "$MNT/usr/share/plymouth/themes/orangepi/watermark.png"
+            fi
+          fi
+
+          # 3. Configure Bootloader Environment
           sudo tee "$MNT/boot/radxaEnv.txt" > /dev/null << 'ENV_EOF'
           verbosity=1
-          bootlogo=false
+          bootlogo=true
           console=both
           overlay_prefix=sun60i-a733
           fdtfile=allwinner/sun60i-a733-cubie-a7a.dtb
@@ -164,11 +178,11 @@ jobs:
           ENV_EOF
           sudo cp -v "$MNT/boot/radxaEnv.txt" "$MNT/boot/orangepiEnv.txt"
 
-          # 3. Patch boot.cmd and recompile boot.scr
+          # 4. Patch boot.cmd and recompile boot.scr
           sudo sed -i 's/if test -e ${devtype} ${devnum} ${prefix}orangepiEnv.txt; then/if test -e ${devtype} ${devnum} ${prefix}radxaEnv.txt; then\n\tload ${devtype} ${devnum} ${load_addr} ${prefix}radxaEnv.txt\n\tenv import -t ${load_addr} ${filesize}\nelif test -e ${devtype} ${devnum} ${prefix}orangepiEnv.txt; then/' "$MNT/boot/boot.cmd"
           sudo mkimage -C none -A arm -T script -d "$MNT/boot/boot.cmd" "$MNT/boot/boot.scr"
 
-          # 4. Hostname and Hosts
+          # 5. Hostname and Hosts
           echo "radxa-cubie-a7a" | sudo tee "$MNT/etc/hostname"
           sudo tee "$MNT/etc/hosts" > /dev/null << 'HOSTS_EOF'
           127.0.0.1   localhost
@@ -180,7 +194,7 @@ jobs:
           ff02::2     ip6-allrouters
           HOSTS_EOF
 
-          # 5. OS Branding
+          # 6. OS Branding
           sudo tee "$MNT/etc/os-release" > /dev/null << 'OS_EOF'
           PRETTY_NAME="Radxa OS 1.0 Alpha (Trixie)"
           NAME="Debian GNU/Linux"
@@ -195,7 +209,7 @@ jobs:
           echo "Radxa Cubie A7A Alpha (Debian Trixie) \l\n" | sudo tee "$MNT/etc/issue"
           echo "Radxa Cubie A7A Alpha (Debian Trixie)" | sudo tee "$MNT/etc/issue.net"
 
-          # 6. Create Radxa User
+          # 7. Create Radxa User
           PASS_HASH=$(openssl passwd -6 -salt radxa123 radxa)
           sudo sed -i '/orangepi/ s/$/,radxa/' "$MNT/etc/group"
           echo "radxa:x:1001:" | sudo tee -a "$MNT/etc/group"
@@ -205,12 +219,12 @@ jobs:
           sudo chown -R 1001:1001 "$MNT/home/radxa"
           echo "radxa ALL=(ALL) NOPASSWD: ALL" | sudo tee "$MNT/etc/sudoers.d/010_radxa-nopasswd"
 
-          # 7. LightDM Autologin
+          # 8. LightDM Autologin
           if [ -f "$MNT/etc/lightdm/lightdm.conf.d/22-orangepi-autologin.conf" ]; then
             sudo sed -i 's/autologin-user=orangepi/autologin-user=radxa/' "$MNT/etc/lightdm/lightdm.conf.d/22-orangepi-autologin.conf"
           fi
 
-          # 8. Welcome Banner
+          # 9. Welcome Banner
           if [ -f "$MNT/etc/update-motd.d/10-orangepi-header" ]; then
             sudo tee "$MNT/etc/update-motd.d/10-orangepi-header" > /dev/null << 'MOTD_EOF'
           #!/bin/sh
