@@ -23,7 +23,7 @@ on:
       flavour:
         description: 'Flavour / Edition'
         required: true
-        default: 'minimal'
+        default: 'desktop-xfce'
         type: choice
         options:
           - minimal
