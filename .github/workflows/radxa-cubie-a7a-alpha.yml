@@ -77,7 +77,6 @@ jobs:
 
           mkdir -p orangepi-build/external/patch/kernel/sun60iw2-next
           cp patch/0001-allwinner-a733-orangepi-4-pro-6.18-mainline.patch orangepi-build/external/patch/kernel/sun60iw2-next/
-          cp patch/0002-allwinner-a733-cubie-a7a-dts.patch orangepi-build/external/patch/kernel/sun60iw2-next/
           cp patch/0300-packaging-armbian-builddeb.patch orangepi-build/external/patch/kernel/sun60iw2-next/
 
           mkdir -p orangepi-build/external/config/kernel
@@ -145,10 +144,15 @@ jobs:
           mkdir -p /tmp/dtb_compile
           CUBIE_DTB=$(find orangepi-build/ -name "sun60i-a733-cubie-a7a.dtb" 2>/dev/null | head -n 1)
           if [ -z "$CUBIE_DTB" ] || [ ! -f "$CUBIE_DTB" ]; then
-            echo "Compiling Cubie A7A DTB from dts/..."
-            cpp -nostdinc -I dts -I dts/include -undef -x assembler-with-cpp dts/sun60i-a733-cubie-a7a.dts /tmp/cubie.dts.pre
-            dtc -I dts -O dtb -o /tmp/dtb_compile/sun60i-a733-cubie-a7a.dtb /tmp/cubie.dts.pre
-            CUBIE_DTB="/tmp/dtb_compile/sun60i-a733-cubie-a7a.dtb"
+            echo "Compiling Cubie A7A DTB from kernel source tree..."
+            KDIR=$(find orangepi-build/kernel/ -maxdepth 1 -name "linux-6.18*" -type d 2>/dev/null | head -n 1)
+            if [ -n "$KDIR" ] && [ -d "$KDIR/scripts/dtc/include-prefixes" ]; then
+              DTC_BIN="$KDIR/scripts/dtc/dtc"
+              [ ! -x "$DTC_BIN" ] && DTC_BIN="dtc"
+              gcc -E -nostdinc -I "$KDIR/scripts/dtc/include-prefixes" -undef -D__DTS__ -x assembler-with-cpp -o /tmp/dtb_compile/cubie.dts.pre dts/sun60i-a733-cubie-a7a.dts
+              $DTC_BIN -o /tmp/dtb_compile/sun60i-a733-cubie-a7a.dtb -b 0 -i"$KDIR/arch/arm64/boot/dts/allwinner/" -i"$KDIR/scripts/dtc/include-prefixes" -Wno-unique_unit_address -Wno-unit_address_vs_reg -Wno-avoid_unnecessary_addr_size -Wno-alias_paths -Wno-graph_child_address -Wno-interrupt_map -Wno-simple_bus_reg /tmp/dtb_compile/cubie.dts.pre
+              CUBIE_DTB="/tmp/dtb_compile/sun60i-a733-cubie-a7a.dtb"
+            fi
           fi
           echo "Using Cubie A7A DTB from: $CUBIE_DTB"
           sudo cp -v "$CUBIE_DTB" "$MNT/boot/sun60i-a733-cubie-a7a.dtb"
