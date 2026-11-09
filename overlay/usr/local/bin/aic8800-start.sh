@@ -4,6 +4,13 @@ set -e
 
 echo "[*] Initializing AIC8800D80 (a69c:8d80) Wi-Fi 6 & Bluetooth..."
 
+# Ensure aic8800.service is enabled so it starts on every boot
+if [ -f /lib/systemd/system/aic8800.service ] && [ ! -L /etc/systemd/system/multi-user.target.wants/aic8800.service ]; then
+    echo "[*] Enabling aic8800.service to automatically start on every boot..."
+    mkdir -p /etc/systemd/system/multi-user.target.wants
+    ln -sf /lib/systemd/system/aic8800.service /etc/systemd/system/multi-user.target.wants/aic8800.service 2>/dev/null || true
+fi
+
 # 1. Power on RF kill switches and board WLAN rails
 rfkill unblock all 2>/dev/null || true
 if [ -e /sys/devices/virtual/misc/sunxi-rfkill/wlan/state ]; then
@@ -49,3 +56,4 @@ if hciconfig hci0 >/dev/null 2>&1; then
 fi
 
 echo "[✓] AIC8800 bring-up script completed."
+echo "[✓] Wi-Fi is now configured to start automatically on every boot."
