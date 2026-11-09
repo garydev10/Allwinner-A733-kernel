@@ -605,6 +605,12 @@
 	"", "", "", "",
 	"", "", "", "";
 
+	husb311_int: husb311-int@0 {
+		pins = "PL3";
+		function = "gpio_in";
+		bias-pull-up;
+	};
+
 	s_twi1_pins_default: s_twi1@0 {
 		pins = "PL12", "PL13";
 		function = "s_twi1";
@@ -1311,6 +1317,8 @@
 		compatible = "hynetek,husb311", "richtek,rt1711h";
 		reg = <0x4e>;
 		status = "okay";
+		pinctrl-names = "default";
+		pinctrl-0 = <&husb311_int>;
 		interrupt-parent = <&r_pio>;
 		interrupts = <PL 3 IRQ_TYPE_LEVEL_LOW>;
 		vbus-supply = <&reg_usb0_vbus>;

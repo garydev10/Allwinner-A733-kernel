@@ -79,6 +79,7 @@ jobs:
           mkdir -p orangepi-build/external/patch/kernel/sun60iw2-next
           cp patch/0001-allwinner-a733-orangepi-4-pro-6.18-mainline.patch orangepi-build/external/patch/kernel/sun60iw2-next/
           cp patch/0300-packaging-armbian-builddeb.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+          [ -f patch/0004-sunxi-drm-edp-silence-hpd-polling-spam.patch ] && cp patch/0004-sunxi-drm-edp-silence-hpd-polling-spam.patch orangepi-build/external/patch/kernel/sun60iw2-next/
 
           mkdir -p orangepi-build/external/config/kernel
           cp config/orangepi_4pro_defconfig orangepi-build/external/config/kernel/linux-sun60iw2-next-a733.config
@@ -336,7 +337,11 @@ jobs:
           FSTAB_SRV
           sudo ln -sf /lib/systemd/system/a733-allwinner-update-fstab.service "$MNT/etc/systemd/system/local-fs.target.wants/a733-allwinner-update-fstab.service"
 
-          # 12. Install AIC8800D80 Wi-Fi Driver & Firmware
+          # 12. Install PowerVR GPU Firmware
+          sudo mkdir -p "$MNT/lib/firmware/powervr/"
+          [ -d "firmware/powervr" ] && sudo cp -v firmware/powervr/* "$MNT/lib/firmware/powervr/"
+
+          # 13. Install AIC8800D80 Wi-Fi Driver & Firmware
           sudo mkdir -p "$MNT/lib/modules/"*"/kernel/drivers/net/wireless/aic8800/"
           sudo cp -v aic8800d80/drivers/aic8800/aic_load_fw/aic_load_fw.ko "$MNT/lib/modules/"*"/kernel/drivers/net/wireless/aic8800/"
           sudo cp -v aic8800d80/drivers/aic8800/aic8800_fdrv/aic8800_fdrv.ko "$MNT/lib/modules/"*"/kernel/drivers/net/wireless/aic8800/"
