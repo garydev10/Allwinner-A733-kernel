@@ -341,6 +341,11 @@ jobs:
           sudo mkdir -p "$MNT/etc/usb_modeswitch.d/"
           sudo cp -v aic8800d80/usb_modeswitch/1111_1111 "$MNT/etc/usb_modeswitch.d/1111:1111"
 
+          # 13. Install wpasupplicant, wireless-tools, and aic8800-start.sh
+          sudo chroot "$MNT" /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends wpasupplicant wireless-tools rfkill iw"
+          sudo cp -v overlay/usr/local/bin/aic8800-start.sh "$MNT/usr/local/bin/aic8800-start.sh"
+          sudo chmod +x "$MNT/usr/local/bin/aic8800-start.sh"
+
           # Run depmod
           KVER=$(basename $(ls -d "$MNT/lib/modules/"*))
           sudo chroot "$MNT" depmod -a "$KVER"
