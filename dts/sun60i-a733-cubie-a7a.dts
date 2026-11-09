@@ -25,6 +25,8 @@
 		regulator-enable-ramp-delay = <1000>;
 		gpio = <&r_pio PL 2 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
 	};
 
 	reg_usb1_vbus: usb1-vbus {
@@ -35,6 +37,8 @@
 		regulator-enable-ramp-delay = <1000>;
 		gpio = <&r_pio PM 5 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
 	};
 
 	wifi_power_en: wifi_power_en {
@@ -1618,13 +1622,13 @@
 };
 
 &ehci1 {
-	drvvbus-supply = <&reg_usb0_vbus>;
+	drvvbus-supply = <&reg_usb1_vbus>;
 	phy_range = <0x188>;
 	status = "okay";
 };
 
 &ohci1 {
-	drvvbus-supply = <&reg_usb0_vbus>;
+	drvvbus-supply = <&reg_usb1_vbus>;
 	phy_range = <0x188>;
 	status = "okay";
 };
@@ -1639,7 +1643,7 @@
 	dr_mode = "host"; //dr_mode option: host, peripheral, otg
 	usb-role-switch;
 	role-switch-default-mode = "host";
-	//drvvbus-supply = <&reg_usb1_vbus>;
+	drvvbus-supply = <&reg_usb1_vbus>;
 //#ifdef TYPEC_DP
 	phys = <&u2phy>, <&combo0_usb>;
 //#else
