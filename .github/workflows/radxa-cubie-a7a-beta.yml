@@ -342,7 +342,7 @@ jobs:
           sudo cp -v aic8800d80/usb_modeswitch/1111_1111 "$MNT/etc/usb_modeswitch.d/1111:1111"
 
           # 13. Install wpasupplicant, wireless-tools, and aic8800-start.sh
-          sudo chroot "$MNT" /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends wpasupplicant wireless-tools rfkill iw"
+          sudo chroot "$MNT" /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends wpasupplicant wireless-tools rfkill iw xserver-xorg xserver-xorg-core xserver-xorg-video-fbdev xinit accountsservice polkitd"
           sudo cp -v overlay/usr/local/bin/aic8800-start.sh "$MNT/usr/local/bin/aic8800-start.sh"
           sudo chmod +x "$MNT/usr/local/bin/aic8800-start.sh"
 
