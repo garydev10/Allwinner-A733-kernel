@@ -330,10 +330,13 @@ jobs:
           sudo ln -sf /lib/systemd/system/a733-allwinner-update-fstab.service "$MNT/etc/systemd/system/local-fs.target.wants/a733-allwinner-update-fstab.service"
 
           # 12. Install AIC8800D80 Wi-Fi Driver & Firmware
-          sudo mkdir -p "$MNT/lib/modules/"*"/kernel/drivers/net/wireless/aic8800/"
-          sudo cp -v aic8800d80/drivers/aic8800/aic_load_fw/aic_load_fw.ko "$MNT/lib/modules/"*"/kernel/drivers/net/wireless/aic8800/"
-          sudo cp -v aic8800d80/drivers/aic8800/aic8800_fdrv/aic8800_fdrv.ko "$MNT/lib/modules/"*"/kernel/drivers/net/wireless/aic8800/"
-          sudo cp -v aic8800d80/drivers/aic8800/aic_zlp_quirk/aic_zlp_quirk.ko "$MNT/lib/modules/"*"/kernel/drivers/net/wireless/aic8800/"
+          KVER_DIR=$(find "$MNT/lib/modules" -mindepth 1 -maxdepth 1 -type d ! -name "*" | head -n 1)
+          KVER=$(basename "$KVER_DIR")
+          echo "Discovered kernel modules version: $KVER"
+          sudo mkdir -p "$KVER_DIR/kernel/drivers/net/wireless/aic8800/"
+          sudo cp -v aic8800d80/drivers/aic8800/aic_load_fw/aic_load_fw.ko "$KVER_DIR/kernel/drivers/net/wireless/aic8800/"
+          sudo cp -v aic8800d80/drivers/aic8800/aic8800_fdrv/aic8800_fdrv.ko "$KVER_DIR/kernel/drivers/net/wireless/aic8800/"
+          sudo cp -v aic8800d80/drivers/aic8800/aic_zlp_quirk/aic_zlp_quirk.ko "$KVER_DIR/kernel/drivers/net/wireless/aic8800/"
           sudo mkdir -p "$MNT/lib/firmware/aic8800/"
           sudo cp -r aic8800d80/fw/* "$MNT/lib/firmware/"
           sudo cp -r aic8800d80/fw/* "$MNT/lib/firmware/aic8800/"
@@ -352,7 +355,7 @@ jobs:
           sudo chroot "$MNT" systemctl disable fstrim.timer 2>/dev/null || sudo rm -f "$MNT/etc/systemd/system/timers.target.wants/fstrim.timer"
 
           # Run depmod
-          KVER=$(basename $(ls -d "$MNT/lib/modules/"*))
+          # KVER already discovered above
           sudo chroot "$MNT" depmod -a "$KVER"
 
           sudo umount "$MNT"
