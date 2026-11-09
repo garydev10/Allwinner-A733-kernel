@@ -1173,12 +1173,16 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
 				regulator-enable-ramp-delay = <1000>;
+				regulator-boot-on;
+				regulator-always-on;
 			};
 			reg_bldo5: bldo5 {
 				regulator-name = "axp8191-bldo5";
-				regulator-min-microvolt = <500000>;
-				regulator-max-microvolt = <3400000>;
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
 				regulator-enable-ramp-delay = <1000>;
+				regulator-boot-on;
+				regulator-always-on;
 			};
 			reg_cldo1: cldo1 {
 				regulator-name = "axp8191-cldo1";
@@ -1193,6 +1197,8 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3500000>;
 				regulator-enable-ramp-delay = <1000>;
+				regulator-boot-on;
+				regulator-always-on;
 			};
 			reg_cldo3: cldo3 {
 				regulator-name = "axp8191-cldo3";
@@ -1310,6 +1316,8 @@
 			reg_dc1sw1: dc1sw1 {
 				regulator-name = "axp8191-dc1sw1";
 				swin-supply = <&reg_dcdc1>;
+				regulator-boot-on;
+				regulator-always-on;
 			};
 			reg_dc1sw2: dc1sw2 {
 				regulator-name = "axp8191-dc1sw2";
@@ -1429,6 +1437,12 @@
 	status = "okay";
 };
 
+&de {
+	assigned-clock-rates = <600000000>;
+	chn_cfg_mode = <0>;
+	status = "okay";
+};
+
 &serdes {
 	status = "okay";
 	combophy0: combo-phy0@6c01000{
@@ -1488,8 +1502,6 @@
 	hdmi_ddc_index = <20>;
 	priority = <6>;
 
-	force-output = <0>;
-	force-output-timing = "440000-3440-3450-4500-4800-1440-1455-1464-1494";
 
 	/* match rule: min clk <= clock < max clk */
 	snps_phy = <

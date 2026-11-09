@@ -117,7 +117,7 @@ fi
 # 3. radxaEnv.txt
 cat << 'ENV_EOF' > "$MNT/boot/radxaEnv.txt"
 verbosity=1
-bootlogo=true
+bootlogo=false
 console=both
 overlay_prefix=sun60i-a733
 fdtfile=allwinner/sun60i-a733-cubie-a7a.dtb
