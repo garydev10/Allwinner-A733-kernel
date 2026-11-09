@@ -6,6 +6,7 @@
 //#define TYPEC_DP 1
 /{
 	board = "A733";
+	model = "Radxa Cubie A7A";
 	compatible = "radxa,a733", "radxa,cubie-a7a", "arm,sun60iw2p1", "allwinner,sun60i-a733";
 	aliases {
 		mmc0 = &mmc0;
@@ -60,6 +61,17 @@
 		regulator-boot-on;
 	};
 
+	reg_pcie_pwr: pcie-pwr {
+		compatible = "regulator-fixed";
+		regulator-name = "pcie_pwr";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-enable-ramp-delay = <1000>;
+		gpio = <&pio PE 11 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-boot-on;
+	};
+
 	//eeprom_wp: eeprom-wp {
 	//	compatible = "regulator-fixed";
 	//	regulator-name = "eeprom_wp";
@@ -80,12 +92,13 @@
 		};
 	};
 
-	//fan0: pwm-fan {
-	//	compatible = "pwm-fan";
-	//	#cooling-cells = <2>; 
-	//	cooling-levels = <0 18 102 170 255>;
-	//	pwms = <&s_pwm0 7 25000 0>;
-	//};
+	fan0: pwm-fan {
+		compatible = "pwm-fan";
+		#cooling-cells = <2>;
+		cooling-levels = <0 18 102 170 255>;
+		pwms = <&s_pwm0 7 25000 0>;
+		status = "okay";
+	};
 
 	leds {
 		compatible = "gpio-leds";
@@ -1411,7 +1424,7 @@
 	pinctrl-names = "active", "sleep";
 	pinctrl-0 = <&s_pwm0_7_pins_active>;
 	pinctrl-1 = <&s_pwm0_7_pins_sleep>;
-	status = "disabled";
+	status = "okay";
 };
 
 &s_pwm0_2 {
@@ -1646,11 +1659,11 @@
 };
 
 &pcie_rc {
-	//power-gpios =  <&r_pio PL 3 GPIO_ACTIVE_HIGH>;
-	reset-gpios = <&pio PD 22 GPIO_ACTIVE_HIGH>;
-	wake-gpios = <&pio PD 21 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&pio PE 13 GPIO_ACTIVE_HIGH>;
+	wake-gpios = <&pio PE 12 GPIO_ACTIVE_HIGH>;
+	clkreq-gpios = <&pio PE 14 GPIO_ACTIVE_HIGH>;
+	pcie3v3-supply = <&reg_pcie_pwr>;
 	pcie1v8-supply = <&reg_bldo1>;
-	pcie3v3-supply = <&reg_dcdc1>;
 	status = "okay";
 };
 
