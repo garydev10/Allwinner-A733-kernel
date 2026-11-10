@@ -394,6 +394,17 @@ jobs:
           done
           ls -lh release_artifacts/
 
+          # Collect generated kernel, headers, u-boot, and firmware deb packages
+          if [ -d "orangepi-build/output/debs" ]; then
+            echo "Collecting kernel, headers, u-boot, and firmware deb packages..."
+            find orangepi-build/output/debs/ -type f -name "*.deb" -exec cp -v {} release_artifacts/ \;
+          fi
+
+          # Generate master SHA256SUMS manifest
+          (cd release_artifacts && sha256sum * > SHA256SUMS 2>/dev/null || true)
+          echo "=== All Packaged Artifacts ==="
+          ls -lh release_artifacts/
+
       - name: Upload Image Artifact to CI Run
         uses: actions/upload-artifact@v4
         with:
@@ -413,5 +424,7 @@ jobs:
           files: |
             release_artifacts/*.xz
             release_artifacts/*.sha256
+            release_artifacts/*.deb
+            release_artifacts/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
