@@ -160,7 +160,9 @@ jobs:
             exit 1
           fi
 
-          RADXA_IMG_NAME="Radxa-Cubie-A7A_1.0.1-beta_${{ github.event.inputs.release || 'trixie' }}_${{ github.event.inputs.flavour || 'minimal' }}_linux6.18.img"
+          RAW_BASENAME=$(basename "$RAW_IMG")
+          KVER_RAW=$(echo "$RAW_BASENAME" | grep -oP "linux\K6\.[0-9]+(\.[0-9]+)?" || echo "6.18")
+          RADXA_IMG_NAME="Radxa-Cubie-A7A_1.0.1-beta_${{ github.event.inputs.release || 'trixie' }}_${{ github.event.inputs.flavour || 'minimal' }}_linux${KVER_RAW}.img"
           RADXA_IMG="orangepi-build/output/${RADXA_IMG_NAME}"
           sudo mv -v "$RAW_IMG" "$RADXA_IMG"
 
@@ -428,3 +430,62 @@ jobs:
             release_artifacts/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prune Redundant Images (Keep Last 3 Kernel Versions)
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag_name || 'radxa-cubie-a7a-beta-v1.0.1' }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, sys, json, re, urllib.request
+
+          repo = os.environ.get('GH_REPO')
+          tag = os.environ.get('TAG')
+          token = os.environ.get('GH_TOKEN')
+
+          headers = {
+              'Authorization': f'token {token}',
+              'User-Agent': 'GitHub-Actions-Prune',
+              'Accept': 'application/vnd.github.v3+json'
+          }
+
+          req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/tags/{tag}', headers=headers)
+          try:
+              r = json.loads(urllib.request.urlopen(req).read().decode())
+          except urllib.error.HTTPError as e:
+              print(f"Release tag {tag} not found ({e}); skipping pruning.")
+              sys.exit(0)
+
+          assets = r.get('assets', [])
+          img_versions = set()
+          for a in assets:
+              m = re.search(r'linux(6\.[0-9]+(?:\.[0-9]+)?)', a['name'])
+              if m:
+                  img_versions.add(m.group(1))
+
+          def ver_key(v):
+              parts = [int(p) for p in v.split('.')]
+              while len(parts) < 3:
+                  parts.append(0)
+              return parts
+
+          sorted_vers = sorted(img_versions, key=ver_key, reverse=True)
+          keep_vers = set(sorted_vers[:3])
+          print(f"[{tag}] Kernel versions in release: {sorted_vers}")
+          print(f"[{tag}] Retaining last 3 versions: {keep_vers}")
+
+          for a in assets:
+              m = re.search(r'linux(6\.[0-9]+(?:\.[0-9]+)?)', a['name'])
+              if m and m.group(1) not in keep_vers:
+                  asset_id = a['id']
+                  asset_name = a['name']
+                  print(f"[{tag}] Pruning redundant asset {asset_name} (ID: {asset_id})...")
+                  del_req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/assets/{asset_id}', headers=headers, method='DELETE')
+                  try:
+                      urllib.request.urlopen(del_req)
+                      print(f"[{tag}] Successfully deleted {asset_name}")
+                  except Exception as err:
+                      print(f"[{tag}] Failed to delete {asset_name}: {err}")
+          PYEOF
