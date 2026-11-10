@@ -1,4 +1,4 @@
-name: Build & Release Radxa Cubie A7A Beta (Debian Trixie)
+name: Build & Release Radxa Cubie A7A Beta
 
 on:
   schedule:
@@ -6,13 +6,18 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: 'Debian release'
+        description: 'Target Distribution & Release'
         required: true
         default: 'trixie'
         type: choice
         options:
           - trixie
           - bookworm
+          - noble
+          - jammy
+          - focal
+          - bullseye
+          - sid
       flavour:
         description: 'Flavour / Edition'
         required: true
@@ -20,8 +25,10 @@ on:
         type: choice
         options:
           - minimal
-          - desktop-xfce
           - server
+          - desktop-xfce
+          - desktop-gnome
+          - desktop-mate
       tag_name:
         description: 'Custom release tag'
         required: false
@@ -108,6 +115,16 @@ jobs:
               BUILD_MINIMAL="no"
               BUILD_DESKTOP="yes"
               DESKTOP_ENV_ARGS="DESKTOP_ENVIRONMENT=xfce DESKTOP_ENVIRONMENT_CONFIG_NAME=config_base DESKTOP_APPGROUPS_SELECTED="
+              ;;
+            desktop-gnome)
+              BUILD_MINIMAL="no"
+              BUILD_DESKTOP="yes"
+              DESKTOP_ENV_ARGS="DESKTOP_ENVIRONMENT=gnome DESKTOP_ENVIRONMENT_CONFIG_NAME=config_base DESKTOP_APPGROUPS_SELECTED="
+              ;;
+            desktop-mate)
+              BUILD_MINIMAL="no"
+              BUILD_DESKTOP="yes"
+              DESKTOP_ENV_ARGS="DESKTOP_ENVIRONMENT=mate DESKTOP_ENVIRONMENT_CONFIG_NAME=config_base DESKTOP_APPGROUPS_SELECTED="
               ;;
           esac
 
@@ -227,8 +244,8 @@ jobs:
           SUPPORT_URL="https://forum.radxa.com"
           BUG_REPORT_URL="https://github.com/radxa"
           OS_EOF
-          echo "Radxa Cubie A7A Beta (Debian Trixie) \l\n" | sudo tee "$MNT/etc/issue"
-          echo "Radxa Cubie A7A Beta (Debian Trixie)" | sudo tee "$MNT/etc/issue.net"
+          echo "Radxa Cubie A7A Beta \l\n" | sudo tee "$MNT/etc/issue"
+          echo "Radxa Cubie A7A Beta" | sudo tee "$MNT/etc/issue.net"
 
           # 8. Create Radxa User and remove orangepi user
           PASS_HASH=$(openssl passwd -6 -salt radxa123 radxa)
@@ -389,7 +406,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag_name || 'radxa-cubie-a7a-beta-v1.0.1' }}
-          name: Radxa Cubie A7A Beta 1.0.1 (Debian Trixie)
+          name: Radxa Cubie A7A Beta 1.0.1
           draft: false
           prerelease: true
           generate_release_notes: true
