@@ -342,9 +342,14 @@ jobs:
           [ -d "firmware/powervr" ] && sudo cp -v firmware/powervr/* "$MNT/lib/firmware/powervr/"
 
           # 13. Install AIC8800D80 Wi-Fi Driver & Firmware
-          KVER_DIR=$(find "$MNT/lib/modules" -mindepth 1 -maxdepth 1 -type d ! -name "*" | head -n 1)
-          KVER=$(basename "$KVER_DIR")
-          echo "Discovered kernel modules version: $KVER"
+          KVER=$(ls -1 "$MNT/lib/modules" | grep -v '^\*' | head -n 1)
+          KVER_DIR="$MNT/lib/modules/$KVER"
+          echo "Discovered kernel modules version: $KVER ($KVER_DIR)"
+          if [ -z "$KVER" ] || [ ! -d "$KVER_DIR" ]; then
+            echo "ERROR: Kernel modules directory not found under $MNT/lib/modules!"
+            ls -la "$MNT/lib/modules" || true
+            exit 1
+          fi
           sudo mkdir -p "$KVER_DIR/kernel/drivers/net/wireless/aic8800/"
           sudo cp -v aic8800d80/drivers/aic8800/aic_load_fw/aic_load_fw.ko "$KVER_DIR/kernel/drivers/net/wireless/aic8800/"
           sudo cp -v aic8800d80/drivers/aic8800/aic8800_fdrv/aic8800_fdrv.ko "$KVER_DIR/kernel/drivers/net/wireless/aic8800/"
