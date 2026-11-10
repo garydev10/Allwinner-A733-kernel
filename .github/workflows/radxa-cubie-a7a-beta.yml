@@ -399,7 +399,12 @@ jobs:
           # Collect generated kernel, headers, u-boot, and firmware deb packages
           if [ -d "orangepi-build/output/debs" ]; then
             echo "Collecting kernel, headers, u-boot, and firmware deb packages..."
-            find orangepi-build/output/debs/ -type f -name "*.deb" -exec cp -v {} release_artifacts/ \;
+            find orangepi-build/output/debs/ -type f -name "*.deb" | while read -r deb; do
+              base=$(basename "$deb")
+              # Rebrand orangepi deb package filenames to a733-allwinner
+              target_name=$(echo "$base" | sed -e 's/^orangepi-/a733-allwinner-/' -e 's/orangepi4pro/a733-allwinner/g')
+              cp -v "$deb" "release_artifacts/$target_name"
+            done
           fi
 
           # Generate master SHA256SUMS manifest
