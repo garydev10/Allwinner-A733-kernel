@@ -377,8 +377,15 @@ jobs:
           done
           ls -lh release_artifacts/
 
+      - name: Upload Image Artifact to CI Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: radxa-cubie-a7a-beta-image
+          path: release_artifacts/*
+          if-no-files-found: error
+
       - name: Create or update GitHub Release
-        if: ${{ github.event.inputs.publish_release != false }}
+        if: ${{ github.event.inputs.publish_release != 'false' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag_name || 'radxa-cubie-a7a-beta-v1.0.1' }}
