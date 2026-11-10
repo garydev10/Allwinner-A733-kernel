@@ -416,7 +416,56 @@ jobs:
 
           # Generate master SHA256SUMS manifest
           (cd release_artifacts && sha256sum * > SHA256SUMS 2>/dev/null || true)
-          echo "=== All Packaged Artifacts ==="
+
+          # Generate structured release notes with board installation guide
+          cat << 'NOTES_EOF' > release_artifacts/release_notes.md
+## Radxa Cubie A7S (Allwinner A733 / sun60iw2)
+
+**Release**: Radxa Cubie A7S Beta (Debian Trixie)
+**Target SoC**: Allwinner A733 (`sun60iw2`)
+**Kernel**: Mainline Linux 6.18.y
+**Base Distribution**: Debian 13 (Trixie) Minimal
+
+---
+
+### Default Credentials
+- **Username**: `radxa`
+- **Password**: `radxa`
+- **Root**: `root` / `radxa`
+
+---
+
+### Board Specifications & Features
+- **Ethernet**: Motorcomm YT8531 Gigabit PHY with EEE power-saving disabled (`eee-broken-1000t`) for reliable networking.
+- **Wi-Fi & Bluetooth**: AIC8800D80 SDIO 4-bit (Wi-Fi 6 802.11ax) + UART1 BT 5.4 driver stack pre-installed.
+- **Display & Serial**: Allwinner Display Engine (`sunxi-drm`) HDMI output (`console=tty1`) and UART0 serial debug on PB9/PB10 (`console=ttyS0,115200`).
+- **Power Management**: Suspend, hibernate, and sleep targets permanently masked for continuous 24/7 server workloads.
+
+---
+
+### Installation Guide
+
+#### Step 1: Download & Verify
+Download the compressed image (`.img.xz`) and SHA256 checksum from the release assets:
+```bash
+# Verify integrity
+sha256sum -c Radxa-Cubie-A7S*.img.xz.sha256
+```
+
+#### Step 2: Flash to MicroSD Card
+- **CLI (Linux / macOS)**:
+  ```bash
+  xz -dc Radxa-Cubie-A7S*.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
+  ```
+- **GUI (Windows / macOS / Linux)**:
+  Flash the `.img.xz` directly using [BalenaEtcher](https://etcher.balena.io/) or [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
+
+#### Step 3: Boot & First Login
+1. Insert MicroSD card into Radxa Cubie A7S.
+2. Connect Ethernet cable and 5V/3A+ USB Type-C power.
+3. Login via SSH: `ssh radxa@<board-ip>` (password: `radxa`) or UART0 PB9/PB10 (115200 baud).
+NOTES_EOF
+          echo "=== All Packaged Artifacts ===" 
           ls -lh release_artifacts/
 
       - name: Upload Image Artifact to CI Run
@@ -434,7 +483,7 @@ jobs:
           name: Radxa Cubie A7S Beta 1.0.0
           draft: false
           prerelease: true
-          generate_release_notes: true
+          body_path: release_artifacts/release_notes.md
           files: |
             release_artifacts/*.xz
             release_artifacts/*.sha256
