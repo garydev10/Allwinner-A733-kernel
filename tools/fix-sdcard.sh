@@ -85,7 +85,7 @@ else
     curl -fsSL "https://raw.githubusercontent.com/jonas5/Allwinner-A733-kernel/main/boot/boot.scr" -o "$BOOT_DIR/boot.scr"
 fi
 
-# 3. Write clean, dual-console environment files
+# 3. Write clean, dual-console environment files with verbose systemd service output
 cat << ENV_EOF > "$BOOT_DIR/radxaEnv.txt"
 verbosity=7
 bootlogo=false
@@ -93,7 +93,7 @@ console=both
 overlay_prefix=sun60i-a733
 fdtfile=allwinner/${DTB_NAME}
 rootfstype=ext4
-extraargs=console=tty1 console=ttyS0,115200 earlycon=uart8250,mmio32,0x02500000 cma=256M
+extraargs=console=tty1 console=ttyS0,115200 earlycon=uart8250,mmio32,0x02500000 cma=256M systemd.show_status=1 systemd.default_standard_output=journal+console systemd.default_standard_error=journal+console
 ENV_EOF
 
 cp -v "$BOOT_DIR/radxaEnv.txt" "$BOOT_DIR/orangepiEnv.txt"
