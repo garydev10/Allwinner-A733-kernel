@@ -97,6 +97,19 @@ cp --sparse=always "${BASE_RAW_IMG}" "${OPI_IMG}"
 cp --sparse=always "${BASE_RAW_IMG}" "${A7A_IMG}"
 cp --sparse=always "${BASE_RAW_IMG}" "${A7S_IMG}"
 
+# Flash verified Radxa Cubie A7A/A7S bootloader (preserves vendor boot0 LPDDR5 init & PB9/PB10 UART)
+A7A_BOOTLOADER="${KERNEL_REPO}/firmware/bootloader-radxa-cubie-a7a.bin"
+if [ ! -f "${A7A_BOOTLOADER}" ] && [ -f "${A7A_BOOTLOADER}.gz" ]; then
+    echo "[*] Decompressing Radxa bootloader firmware..."
+    gzip -d -k "${A7A_BOOTLOADER}.gz"
+fi
+if [ -f "${A7A_BOOTLOADER}" ]; then
+    echo "[*] Flashing verified Radxa A7A bootloader into A7A image..."
+    dd if="${A7A_BOOTLOADER}" of="${A7A_IMG}" bs=512 seek=16 conv=notrunc status=none
+    echo "[*] Flashing verified Radxa A7A/A7S bootloader into A7S image..."
+    dd if="${A7A_BOOTLOADER}" of="${A7S_IMG}" bs=512 seek=16 conv=notrunc status=none
+fi
+
 # Compile DTBs if needed
 KDIR=$(find "${HARNESS_DIR}/kernel/" -maxdepth 1 -name "linux-6.18*" -type d 2>/dev/null | head -n 1)
 DTC_BIN="${KDIR}/scripts/dtc/dtc"
@@ -234,8 +247,9 @@ bootlogo=false
 console=both
 overlay_prefix=sun60i-a733
 fdtfile=allwinner/sun60i-a733-cubie-a7a.dtb
+rootdev=/dev/mmcblk0p1
 rootfstype=ext4
-extraargs=cma=256M
+extraargs=console=tty1 console=ttyS0,115200 earlyprintk=sunxi-uart,0x02500000 cma=256M systemd.show_status=1 systemd.default_standard_output=journal+console systemd.default_standard_error=journal+console
 ENV_EOF
         cp -v "${mnt}/boot/radxaEnv.txt" "${mnt}/boot/orangepiEnv.txt"
 
@@ -289,8 +303,9 @@ bootlogo=false
 console=both
 overlay_prefix=sun60i-a733
 fdtfile=allwinner/sun60i-a733-cubie-a7s.dtb
+rootdev=/dev/mmcblk0p1
 rootfstype=ext4
-extraargs=cma=256M
+extraargs=console=tty1 console=ttyS0,115200 earlyprintk=sunxi-uart,0x02500000 cma=256M systemd.show_status=1 systemd.default_standard_output=journal+console systemd.default_standard_error=journal+console
 ENV_EOF
         cp -v "${mnt}/boot/radxaEnv.txt" "${mnt}/boot/orangepiEnv.txt"
 
@@ -331,9 +346,11 @@ BUG_REPORT_URL="https://github.com/radxa"
 OS_EOF
     fi
 
-    # Ensure /etc/fstab mounts root by PARTUUID
+    # Ensure /etc/fstab has valid root mount
     if [ -f "${mnt}/etc/fstab" ]; then
-        sed -i 's|^/dev/mmcblk0p1|/dev/disk/by-partuuid/.*|' "${mnt}/etc/fstab" || true
+        if ! grep -q "/ ext4" "${mnt}/etc/fstab"; then
+            echo "/dev/mmcblk0p1 / ext4 defaults,noatime,commit=600,errors=remount-ro 0 1" >> "${mnt}/etc/fstab"
+        fi
     fi
 
     sync

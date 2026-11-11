@@ -392,6 +392,16 @@ jobs:
           sudo chroot "$MNT" depmod -a "$KVER"
 
           sudo umount "$MNT"
+
+          # 15. Flash verified Radxa bootloader (boot0 + U-Boot with LPDDR5 init & PB9/PB10 UART)
+          echo "=== Flashing verified Radxa bootloader into $RADXA_IMG ==="
+          if [ -f "firmware/bootloader-radxa-cubie-a7a.bin" ]; then
+            sudo dd if="firmware/bootloader-radxa-cubie-a7a.bin" of="$RADXA_IMG" bs=512 seek=16 conv=notrunc status=none
+          elif [ -f "firmware/bootloader-radxa-cubie-a7a.bin.gz" ]; then
+            gzip -d -k "firmware/bootloader-radxa-cubie-a7a.bin.gz"
+            sudo dd if="firmware/bootloader-radxa-cubie-a7a.bin" of="$RADXA_IMG" bs=512 seek=16 conv=notrunc status=none
+          fi
+
           echo "[+] Image transformation complete: $RADXA_IMG"
 
       - name: Package artifacts

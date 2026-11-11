@@ -33,3 +33,5 @@ powervr-start.sh
 aic8800-start.sh
 vk_layer_pvr_strip.c
 !firmware/powervr/*.fw
+!firmware/*.bin.gz
+
