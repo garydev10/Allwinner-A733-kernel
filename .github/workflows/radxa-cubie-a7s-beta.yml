@@ -151,13 +151,6 @@ jobs:
           cd aic8800d80/drivers/aic8800
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- KDIR="$GITHUB_WORKSPACE/$KHDR" modules
 
-      - name: Build Mainline U-Boot 2026 for radxa-cubie-a7s
-        run: |
-          echo "=== Building Mainline U-Boot for radxa-cubie-a7s ==="
-          sudo apt-get update && sudo apt-get install -y python3-setuptools swig libssl-dev libgnutls28-dev uuid-dev
-          ./bootloader/u-boot-mainline/build-uboot-allwinner.sh radxa-cubie-a7s /tmp/u-boot-radxa-cubie-a7s
-          ls -la /tmp/u-boot-radxa-cubie-a7s
-
       - name: Transform Image for Radxa Cubie A7S (Beta)
         run: |
           echo "=== Transforming built image into Radxa Cubie A7S Beta ==="
@@ -211,7 +204,7 @@ jobs:
 
           # 3. Configure Bootloader Environment & Root Mount
           sudo tee "$MNT/boot/radxaEnv.txt" > /dev/null << 'ENV_EOF'
-          verbosity=1
+          verbosity=7
           bootlogo=false
           console=both
           overlay_prefix=sun60i-a733
@@ -397,14 +390,6 @@ jobs:
           sudo chroot "$MNT" depmod -a "$KVER"
 
           sudo umount "$MNT"
-
-          # 15. Flash Mainline U-Boot into raw image boot sectors (replaces legacy vendor 2018.05)
-          if [ -f "/tmp/u-boot-radxa-cubie-a7s/u-boot-sunxi-with-spl.bin" ]; then
-            echo "Burning Mainline U-Boot into $RADXA_IMG..."
-            sudo dd if=/dev/zero of="$RADXA_IMG" bs=1k count=1023 seek=1 conv=notrunc status=none
-            sudo dd if="/tmp/u-boot-radxa-cubie-a7s/u-boot-sunxi-with-spl.bin" of="$RADXA_IMG" bs=1k seek=8 conv=notrunc,fsync status=none
-            echo "[+] Successfully flashed Mainline U-Boot into $RADXA_IMG"
-          fi
           echo "[+] Image transformation complete: $RADXA_IMG"
 
       - name: Package artifacts
