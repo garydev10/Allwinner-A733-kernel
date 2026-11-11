@@ -163,7 +163,7 @@ jobs:
 
           RAW_BASENAME=$(basename "$RAW_IMG")
           KVER_RAW=$(echo "$RAW_BASENAME" | grep -oP "linux\K6\.[0-9]+(\.[0-9]+)?" || echo "6.18")
-          RADXA_IMG_NAME="Radxa-Cubie-A7A_1.0.1-beta_${{ github.event.inputs.release || 'trixie' }}_${{ github.event.inputs.flavour || 'minimal' }}_linux${KVER_RAW}.img"
+          RADXA_IMG_NAME="Radxa-Cubie-A7A_1.0.2-beta_${{ github.event.inputs.release || 'trixie' }}_${{ github.event.inputs.flavour || 'minimal' }}_linux${KVER_RAW}.img"
           RADXA_IMG="orangepi-build/output/${RADXA_IMG_NAME}"
           sudo mv -v "$RAW_IMG" "$RADXA_IMG"
 
@@ -240,10 +240,10 @@ jobs:
 
           # 7. OS Branding
           sudo tee "$MNT/etc/os-release" > /dev/null << 'OS_EOF'
-          PRETTY_NAME="Radxa OS 1.0 Beta (Trixie)"
+          PRETTY_NAME="Radxa OS 1.0.2 (Trixie)"
           NAME="Debian GNU/Linux"
           VERSION_ID="13"
-          VERSION="13 (trixie) Beta"
+          VERSION="1.0.2 (trixie)"
           VERSION_CODENAME=trixie
           ID=debian
           HOME_URL="https://radxa.com"
