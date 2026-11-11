@@ -3,9 +3,13 @@ set -eo pipefail
 
 BOARD="${1:-radxa-cubie-a7s}"
 OUTPUT_DIR="${2:-/srv/kernel/Allwinner-A733-kernel/bootloader/u-boot-mainline/out/$BOARD}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATCH_DIR="$SCRIPT_DIR/patches"
 
 echo "=================================================="
 echo " Building Mainline U-Boot for $BOARD"
+echo " Script Dir: $SCRIPT_DIR"
+echo " Patch Dir:  $PATCH_DIR"
 echo " Target Output: $OUTPUT_DIR"
 echo "=================================================="
 
@@ -27,8 +31,10 @@ echo "--> [3/4] Cloning dlan17/u-boot (branch allwinner/A733/next)..."
 git clone --depth 1 -b allwinner/A733/next https://github.com/dlan17/u-boot "$WORK_DIR/u-boot"
 
 echo "--> [4/4] Applying board & pinctrl patches..."
-PATCH_DIR="$(dirname "$0")/patches"
 cd "$WORK_DIR/u-boot"
+
+echo "Listing patches in $PATCH_DIR:"
+ls -la "$PATCH_DIR"
 
 for p in "$PATCH_DIR"/*.patch; do
   [ -f "$p" ] || continue
