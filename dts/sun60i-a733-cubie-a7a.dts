@@ -2564,7 +2564,7 @@
 
 &de {
 	assigned-clock-rates = <600000000>;
-	chn_cfg_mode = <0>;
+	chn_cfg_mode = <2>;
 	status = "okay";
 };
 
@@ -2665,6 +2665,9 @@
 	hdmi_resistor_select = <1>;
 	hdmi_ddc_index = <20>;
 	priority = <6>;
+
+	force-output = <0>;
+	force-output-timing = "440000-3440-3450-4500-4800-1440-1455-1464-1494";
 
 	/* match rule: min clk <= clock < max clk */
 	snps_phy = <
