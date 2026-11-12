@@ -124,6 +124,8 @@ jobs:
           mkdir -p orangepi-build/external/patch/kernel/sun60iw2-next
           cp patch/0001-allwinner-a733-orangepi-4-pro-6.18-mainline.patch orangepi-build/external/patch/kernel/sun60iw2-next/
           cp patch/0300-packaging-armbian-builddeb.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+          [ -f patch/0210-a733-orangepi-4-pro-rgmii-delay.patch ] && cp patch/0210-a733-orangepi-4-pro-rgmii-delay.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+          [ -f patch/0215-workqueue-guard-null-task-kick-pool.patch ] && cp patch/0215-workqueue-guard-null-task-kick-pool.patch orangepi-build/external/patch/kernel/sun60iw2-next/
 
           # Copy modular defconfig
           mkdir -p orangepi-build/external/config/kernel
