@@ -379,6 +379,19 @@ run_module_workflow() {
         return 1
     fi
 
+    local resp_status
+    resp_status=$(echo "$submit_resp" | jq -r '.status // empty' 2>/dev/null)
+    if [ "$resp_status" = "pending_release" ]; then
+        local pend_msg
+        pend_msg=$(echo "$submit_resp" | jq -r '.message // "waiting for source to compile release, usually happen once a day."' 2>/dev/null)
+        if [ "$interactive" = "1" ]; then
+            $UI_TOOL --title "Driver Release Pending" --msgbox "$pend_msg" 10 70
+        else
+            log_warn "$pend_msg"
+        fi
+        return 0
+    fi
+
     local request_id
     local dl_hash
     local initial_dl_url
