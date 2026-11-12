@@ -1,0 +1,11 @@
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -1272,6 +1272,8 @@
+ 	}
+ 
+ 	p = worker->task;
++	if (!p)
++		return false;
+ 
+ #ifdef CONFIG_SMP
+ 	/*
