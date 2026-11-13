@@ -185,6 +185,44 @@ jobs:
             BUILD_DESKTOP=${BUILD_DESKTOP} \
             ${DESKTOP_ENV_ARGS}
 
+      - name: Post-process SD image (Universal bootloader & rootdev fix)
+        if: steps.check-kernel.outputs.should_skip != 'true' && github.event.inputs.reuse_run_id == ''
+        run: |
+          echo "=== Post-processing generated SD images ==="
+          find orangepi-build/output/ -type f -name "*.img" | while read -r img; do
+            echo "Patching image: $img"
+            if [ -f "boot/bootloader-orangepi-4-pro.bin" ]; then
+              echo "Writing bootloader to $img at sector 16..."
+              dd if=boot/bootloader-orangepi-4-pro.bin of="$img" bs=512 seek=16 conv=notrunc
+            fi
+            LOOPDEV=$(sudo losetup -fP --show "$img")
+            echo "Mounted $img on $LOOPDEV"
+            mkdir -p /tmp/img_root
+            sudo mount "${LOOPDEV}p1" /tmp/img_root
+            if [ -f /tmp/img_root/boot/orangepiEnv.txt ]; then
+              sudo sed -i 's/^rootdev=UUID=.*/rootdev=\/dev\/mmcblk0p1/' /tmp/img_root/boot/orangepiEnv.txt
+              sudo sed -i 's/^rootdev=PARTUUID=.*/rootdev=\/dev\/mmcblk0p1/' /tmp/img_root/boot/orangepiEnv.txt
+              if ! grep -q "console=" /tmp/img_root/boot/orangepiEnv.txt; then
+                echo "console=both" | sudo tee -a /tmp/img_root/boot/orangepiEnv.txt
+              fi
+            fi
+            if [ -f boot/boot.cmd ]; then
+              sudo cp -vf boot/boot.cmd /tmp/img_root/boot/boot.cmd
+              sudo cp -vf boot/boot.scr /tmp/img_root/boot/boot.scr
+            fi
+            sudo mkdir -p /tmp/img_root/etc/systemd/system/serial-getty@ttyS0.service.d
+            printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty -o "-p -- \\u" --autologin root --noclear -s %%I 115200 vt220\nStandardInput=tty\nStandardOutput=tty\n' | sudo tee /tmp/img_root/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf
+            sudo mkdir -p /tmp/img_root/etc/systemd/system/getty@tty1.service.d
+            printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty -o "-p -- \\u" --autologin root --noclear %%I 38400 linux\nStandardInput=tty\nStandardOutput=tty\n' | sudo tee /tmp/img_root/etc/systemd/system/getty@tty1.service.d/autologin.conf
+            sudo mkdir -p /tmp/img_root/etc/systemd/system/getty.target.wants
+            sudo ln -sf /lib/systemd/system/serial-getty@.service /tmp/img_root/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service
+            sudo ln -sf /lib/systemd/system/getty@.service /tmp/img_root/etc/systemd/system/getty.target.wants/getty@tty1.service
+            sync
+            sudo umount /tmp/img_root
+            sudo losetup -d "$LOOPDEV"
+            echo "Successfully patched $img"
+          done
+
       - name: Package artifacts
         if: steps.check-kernel.outputs.should_skip != 'true' && github.event.inputs.reuse_run_id == ''
         run: |
