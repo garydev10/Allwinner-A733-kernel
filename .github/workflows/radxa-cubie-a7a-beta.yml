@@ -271,14 +271,29 @@ jobs:
           echo "radxa ALL=(ALL) NOPASSWD: ALL" | sudo tee "$MNT/etc/sudoers.d/010_radxa-nopasswd"
           sudo sed -i '/^orangepi:/d' "$MNT/etc/passwd" "$MNT/etc/shadow" "$MNT/etc/group" 2>/dev/null || true
 
-          # 9. Disable autologin completely (prompt for login)
-          sudo rm -rf "$MNT/usr/lib/systemd/system/getty@.service.d" 2>/dev/null || true
-          sudo rm -rf "$MNT/usr/lib/systemd/system/serial-getty@.service.d" 2>/dev/null || true
-          sudo rm -rf "$MNT/lib/systemd/system/getty@.service.d" 2>/dev/null || true
-          sudo rm -rf "$MNT/lib/systemd/system/serial-getty@.service.d" 2>/dev/null || true
-          sudo rm -rf "$MNT/etc/systemd/system/getty@.service.d" 2>/dev/null || true
-          sudo rm -rf "$MNT/etc/systemd/system/serial-getty@.service.d" 2>/dev/null || true
-          sudo rm -f "$MNT/etc/lightdm/lightdm.conf.d/"*autologin*.conf 2>/dev/null || true
+          # 9. Configure autologin for radxa user on serial (ttyS0) and HDMI VT (tty1)
+          sudo mkdir -p "$MNT/etc/systemd/system/serial-getty@ttyS0.service.d"
+          sudo tee "$MNT/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf" > /dev/null << 'GETTY_EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o "-p -f -- \u" --keep-baud --autologin radxa 115200,38400,9600 %I $TERM
+GETTY_EOF
+
+          sudo mkdir -p "$MNT/etc/systemd/system/getty@tty1.service.d"
+          sudo tee "$MNT/etc/systemd/system/getty@tty1.service.d/override.conf" > /dev/null << 'GETTY_EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o "-p -f -- \u" --noclear --autologin radxa %I $TERM
+GETTY_EOF
+
+          if [ -d "$MNT/etc/lightdm" ]; then
+            sudo mkdir -p "$MNT/etc/lightdm/lightdm.conf.d"
+            sudo tee "$MNT/etc/lightdm/lightdm.conf.d/22-radxa-autologin.conf" > /dev/null << 'LIGHTDM_EOF'
+[Seat:*]
+autologin-user=radxa
+autologin-user-timeout=0
+LIGHTDM_EOF
+          fi
 
           # 10. Rebrand Systemd Services (orangepi-* -> a733-allwinner-*)
           sudo rm -f "$MNT/etc/update-motd.d/41-orangepi-config" "$MNT/etc/orangepi.txt" 2>/dev/null || true
@@ -388,9 +403,14 @@ jobs:
 
           sudo umount "$MNT"
 
-          # 15. Flash verified Radxa bootloader (boot0 + U-Boot with LPDDR5 init & PB9/PB10 UART)
-          echo "=== Flashing verified Radxa bootloader into $RADXA_IMG ==="
-          if [ -f "firmware/bootloader-radxa-cubie-a7a.bin" ]; then
+          # 15. Flash verified bootloader (boot0 + U-Boot with cross-board boot compatibility)
+          echo "=== Flashing verified bootloader into $RADXA_IMG ==="
+          if [ -f "firmware/bootloader-orangepi-4-pro.bin" ]; then
+            sudo dd if="firmware/bootloader-orangepi-4-pro.bin" of="$RADXA_IMG" bs=512 seek=16 conv=notrunc status=none
+          elif [ -f "firmware/bootloader-orangepi-4-pro.bin.gz" ]; then
+            gzip -d -k "firmware/bootloader-orangepi-4-pro.bin.gz"
+            sudo dd if="firmware/bootloader-orangepi-4-pro.bin" of="$RADXA_IMG" bs=512 seek=16 conv=notrunc status=none
+          elif [ -f "firmware/bootloader-radxa-cubie-a7a.bin" ]; then
             sudo dd if="firmware/bootloader-radxa-cubie-a7a.bin" of="$RADXA_IMG" bs=512 seek=16 conv=notrunc status=none
           elif [ -f "firmware/bootloader-radxa-cubie-a7a.bin.gz" ]; then
             gzip -d -k "firmware/bootloader-radxa-cubie-a7a.bin.gz"
