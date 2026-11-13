@@ -1412,13 +1412,14 @@
 	phy-names = "dp-phy", "aux-phy";
 	sys = <&vo1>;
 
+	force_mode = "dp";
 	edp_colordepth = <8>; /* 6/8/10/12/16 */
 	edp_color_fmt = <0>;
 	edp_ssc_en = <0>;
 	edp_ssc_mode = <0>;
 
 	edp_lane_rate = <2>;
-	edp_lane_cnt = <4>;
+	edp_lane_cnt = <2>;
 	extcon = <&serdes>;
 
 	status = "okay";
