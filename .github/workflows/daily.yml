@@ -148,6 +148,8 @@ jobs:
           mkdir -p orangepi-build/external/patch/kernel/sun60iw2-next
           cp patch/0001-allwinner-a733-orangepi-4-pro-6.18-mainline.patch orangepi-build/external/patch/kernel/sun60iw2-next/
           cp patch/0300-packaging-armbian-builddeb.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+          [ -f patch/0210-a733-orangepi-4-pro-rgmii-delay.patch ] && cp patch/0210-a733-orangepi-4-pro-rgmii-delay.patch orangepi-build/external/patch/kernel/sun60iw2-next/
+          [ -f patch/0215-workqueue-guard-null-task-kick-pool.patch ] && cp patch/0215-workqueue-guard-null-task-kick-pool.patch orangepi-build/external/patch/kernel/sun60iw2-next/
           cp patch/0003-allwinner-a733-cedrus-vpu-support.patch orangepi-build/external/patch/kernel/sun60iw2-next/
 
           # Copy U-Boot A733 boot patches (NVMe + defconfig + board DTS)
@@ -331,6 +333,44 @@ jobs:
             echo "NVMe rootfs reconfiguration complete: $NVME_IMG"
           fi
 
+      - name: Post-process SD image (Universal bootloader & rootdev fix)
+        if: steps.check-kernel.outputs.should_skip != 'true' && github.event.inputs.reuse_run_id == ''
+        run: |
+          echo "=== Post-processing generated SD images ==="
+          find orangepi-build/output/ -type f -name "*.img" | while read -r img; do
+            echo "Patching image: $img"
+            if [ -f "boot/bootloader-orangepi-4-pro.bin" ]; then
+              echo "Writing bootloader to $img at sector 16..."
+              dd if=boot/bootloader-orangepi-4-pro.bin of="$img" bs=512 seek=16 conv=notrunc
+            fi
+            LOOPDEV=$(sudo losetup -fP --show "$img")
+            echo "Mounted $img on $LOOPDEV"
+            mkdir -p /tmp/img_root
+            sudo mount "${LOOPDEV}p1" /tmp/img_root
+            if [ -f /tmp/img_root/boot/orangepiEnv.txt ]; then
+              sudo sed -i 's/^rootdev=UUID=.*/rootdev=\/dev\/mmcblk0p1/' /tmp/img_root/boot/orangepiEnv.txt
+              sudo sed -i 's/^rootdev=PARTUUID=.*/rootdev=\/dev\/mmcblk0p1/' /tmp/img_root/boot/orangepiEnv.txt
+              if ! grep -q "console=" /tmp/img_root/boot/orangepiEnv.txt; then
+                echo "console=both" | sudo tee -a /tmp/img_root/boot/orangepiEnv.txt
+              fi
+            fi
+            if [ -f boot/boot.cmd ]; then
+              sudo cp -vf boot/boot.cmd /tmp/img_root/boot/boot.cmd
+              sudo cp -vf boot/boot.scr /tmp/img_root/boot/boot.scr
+            fi
+            sudo mkdir -p /tmp/img_root/etc/systemd/system/serial-getty@ttyS0.service.d
+            printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty -o "-p -- \\u" --autologin root --noclear -s %%I 115200 vt220\nStandardInput=tty\nStandardOutput=tty\n' | sudo tee /tmp/img_root/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf
+            sudo mkdir -p /tmp/img_root/etc/systemd/system/getty@tty1.service.d
+            printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty -o "-p -- \\u" --autologin root --noclear %%I 38400 linux\nStandardInput=tty\nStandardOutput=tty\n' | sudo tee /tmp/img_root/etc/systemd/system/getty@tty1.service.d/autologin.conf
+            sudo mkdir -p /tmp/img_root/etc/systemd/system/getty.target.wants
+            sudo ln -sf /lib/systemd/system/serial-getty@.service /tmp/img_root/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service
+            sudo ln -sf /lib/systemd/system/getty@.service /tmp/img_root/etc/systemd/system/getty.target.wants/getty@tty1.service
+            sync
+            sudo umount /tmp/img_root
+            sudo losetup -d "$LOOPDEV"
+            echo "Successfully patched $img"
+          done
+
       - name: Package artifacts
         if: steps.check-kernel.outputs.should_skip != 'true' && github.event.inputs.reuse_run_id == ''
         run: |
@@ -354,7 +394,12 @@ jobs:
           # 2. Collect generated kernel and u-boot deb packages
           if [ -d "orangepi-build/output/debs" ]; then
             echo "Collecting kernel and u-boot deb packages..."
-            find orangepi-build/output/debs/ -type f -name "*.deb" -exec cp -v {} release_artifacts/ \;
+            find orangepi-build/output/debs/ -type f -name "*.deb" | while read -r deb; do
+              base=$(basename "$deb")
+              # Rebrand orangepi deb package filenames to a733-allwinner
+              target_name=$(echo "$base" | sed -e 's/^orangepi-/a733-allwinner-/' -e 's/orangepi4pro/a733-allwinner/g')
+              cp -v "$deb" "release_artifacts/$target_name"
+            done
           fi
 
           # 3. Generate master SHA256SUMS manifest
@@ -478,3 +523,62 @@ jobs:
           else
             echo "### Successfully Published Release: [$TAG](https://github.com/${{ github.repository }}/releases/tag/${TAG})" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Prune Redundant Images (Keep Last 3 Kernel Versions)
+        if: steps.check-kernel.outputs.should_skip != 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.publish_release != false)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag_name || 'daily' }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, sys, json, re, urllib.request
+
+          repo = os.environ.get('GH_REPO')
+          tag = os.environ.get('TAG', 'daily')
+          token = os.environ.get('GH_TOKEN')
+
+          headers = {
+              'Authorization': f'token {token}',
+              'User-Agent': 'GitHub-Actions-Prune',
+              'Accept': 'application/vnd.github.v3+json'
+          }
+
+          req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/tags/{tag}', headers=headers)
+          try:
+              r = json.loads(urllib.request.urlopen(req).read().decode())
+          except urllib.error.HTTPError as e:
+              print(f"Release tag {tag} not found ({e}); skipping pruning.")
+              sys.exit(0)
+
+          assets = r.get('assets', [])
+          img_versions = set()
+          for a in assets:
+              m = re.search(r'linux(6\.[0-9]+(?:\.[0-9]+)?)', a['name'])
+              if m:
+                  img_versions.add(m.group(1))
+
+          def ver_key(v):
+              parts = [int(p) for p in v.split('.')]
+              while len(parts) < 3:
+                  parts.append(0)
+              return parts
+
+          sorted_vers = sorted(img_versions, key=ver_key, reverse=True)
+          keep_vers = set(sorted_vers[:3])
+          print(f"[{tag}] Kernel versions in release: {sorted_vers}")
+          print(f"[{tag}] Retaining last 3 versions: {keep_vers}")
+
+          for a in assets:
+              m = re.search(r'linux(6\.[0-9]+(?:\.[0-9]+)?)', a['name'])
+              if m and m.group(1) not in keep_vers:
+                  asset_id = a['id']
+                  asset_name = a['name']
+                  print(f"[{tag}] Pruning redundant asset {asset_name} (ID: {asset_id})...")
+                  del_req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/assets/{asset_id}', headers=headers, method='DELETE')
+                  try:
+                      urllib.request.urlopen(del_req)
+                      print(f"[{tag}] Successfully deleted {asset_name}")
+                  except Exception as err:
+                      print(f"[{tag}] Failed to delete {asset_name}: {err}")
+          PYEOF

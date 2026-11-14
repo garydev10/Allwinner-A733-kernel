@@ -1,0 +1,12 @@
+[Unit]
+Description=AIC8800 Wi-Fi 6 & Bluetooth Hardware Initialization
+After=basic.target network-pre.target
+Before=network.target NetworkManager.service wpa_supplicant.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aic8800-start.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

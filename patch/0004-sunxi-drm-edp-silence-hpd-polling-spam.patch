@@ -1,0 +1,11 @@
+--- a/bsp/drivers/drm/sunxi_drm_edp.c
++++ b/bsp/drivers/drm/sunxi_drm_edp.c
+@@ -3123,7 +3123,7 @@ static enum drm_connector_status drm_edp_connector_detect(struct drm_connector
+ 		return connector_status_connected;
+ 	}
+ 
+-	EDP_INFO("drm_edp->hpd_state_now: %d\n", drm_edp->hpd_state_now);
++	EDP_DBG("drm_edp->hpd_state_now: %d\n", drm_edp->hpd_state_now);
+ 	return drm_edp->hpd_state_now ? connector_status_connected :
+ 				connector_status_disconnected;
+ }

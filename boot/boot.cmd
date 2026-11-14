@@ -27,7 +27,7 @@ if test "${logo}" = "disabled"; then setenv logo "logo.nologo"; fi
 # Ensure serial console is last when both is selected so it remains primary on UART
 if test "${console}" = "display"; then setenv consoleargs "console=tty1"; fi
 if test "${console}" = "serial"; then setenv consoleargs "console=ttyS0,115200"; fi
-if test "${console}" = "both"; then setenv consoleargs "console=tty1 console=ttyS0,115200"; fi
+if test "${console}" = "both"; then setenv consoleargs "console=ttyS0,115200 console=tty1"; fi
 
 if test "${earlycon}" = "on"; then setenv consoleargs "earlycon=uart8250,mmio32,0x02500000 earlyprintk=sunxi-uart,0x02500000 ${consoleargs}"; fi
 if test "${bootlogo}" = "true"; then
